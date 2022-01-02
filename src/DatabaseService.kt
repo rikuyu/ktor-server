@@ -1,9 +1,7 @@
 package com.example
 
-import org.jetbrains.exposed.dao.IntEntity
-import org.jetbrains.exposed.dao.IntEntityClass
-import org.jetbrains.exposed.dao.id.EntityID
-import org.jetbrains.exposed.dao.id.IntIdTable
+import com.example.model.Member
+import com.example.model.Members
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.transactions.transaction
 
@@ -23,49 +21,50 @@ object DatabaseService {
         )
     }
 
-    fun dsl() {
+    fun getAllMembers(): List<Member> {
+        var members = listOf<Member>()
         transaction {
-            addLogger(StdOutSqlLogger)
-
-            val id = Member.insert {
-                it[name] = "Kotlin"
-            } get Member.id
-            println("inserted id: $id")
-
-            val member = Member.select { Member.id eq id }.single()
-            println("id: ${member[Member.id]}")
-            println("name: ${member[Member.name]}")
-        }
-    }
-
-    object Member : Table("member") {
-        val id = integer("id").autoIncrement()
-        val name = varchar("name", 32)
-    }
-
-    fun dao() {
-        transaction {
-            addLogger(StdOutSqlLogger)
-
-            val member = MemberEntity.new {
-                name = "kotlin"
+            members = Members.selectAll().map {
+                Member(
+                    id = it[Members.id],
+                    name = it[Members.name].toString(),
+                    age = it[Members.age]
+                )
             }
-            println("inserted id: ${member.id}")
+        }
+        return members
+    }
 
-            MemberEntity.findById(member.id)?.let {
-                println("id: ${it.id}")
-                println("name: ${it.name}")
+    fun getMember(id: Int): Member? {
+        var member: Member? = null
+        transaction {
+            member = Members.select { Members.id eq id }
+                .map { convertToMember(it) }
+                .firstOrNull()
+        }
+        return member
+    }
+
+    fun insertMember(name: String, age: Int) {
+        transaction {
+            Members.insert {
+                it[this.name] = name
+                it[this.age] = age
             }
         }
     }
 
-    object MemberTable : IntIdTable("member") {
-        val name = varchar("name", 32)
+    fun deleteMember(id: Int){
+        transaction {
+            Members.deleteWhere { Members.id eq id }
+        }
     }
 
-    class MemberEntity(id: EntityID<Int>) : IntEntity(id) {
-        companion object : IntEntityClass<MemberEntity>(MemberTable)
-
-        var name by MemberTable.name
+    private fun convertToMember(row: ResultRow): Member {
+        return Member(
+            id = row[Members.id],
+            name = row[Members.name],
+            age = row[Members.age]
+        )
     }
 }
